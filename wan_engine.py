@@ -29,6 +29,13 @@ class WanAnimate2Engine:
                     if chunk:
                         handle.write(chunk)
 
+    @staticmethod
+    def _write_base64(payload: str, destination: Path):
+        raw = payload.strip()
+        if raw.startswith("data:"):
+            _, raw = raw.split(",", 1)
+        destination.write_bytes(base64.b64decode(raw, validate=True))
+
     def _load_pipeline(self):
         if self._pipeline is not None:
             return self._pipeline
@@ -60,7 +67,8 @@ class WanAnimate2Engine:
         import torch
         from diffusers.utils import export_to_video, load_image, load_video
 
-        reference_url = data["reference_image"]
+        reference_url = data.get("reference_image")
+        reference_b64 = data.get("reference_image_base64")
         driving_url = data["driving_video"]
         prompt = data.get("prompt", "")
         seed = int(data.get("seed", 12345))
@@ -74,7 +82,11 @@ class WanAnimate2Engine:
             driving_path = tmpdir / "driving.mp4"
             output_path = tmpdir / "output.mp4"
 
-            self._download(reference_url, reference_path)
+            if reference_b64:
+                self._write_base64(reference_b64, reference_path)
+            else:
+                self._download(reference_url, reference_path)
+
             self._download(driving_url, driving_path)
 
             pipe = self._load_pipeline()
@@ -112,5 +124,6 @@ class WanAnimate2Engine:
                 "driving_bytes": driving_path.stat().st_size,
                 "output_bytes": output_path.stat().st_size,
                 "video_mime": "video/mp4",
+                "video_name": "wan-animate-2-output.mp4",
                 "video_base64": payload,
             }
