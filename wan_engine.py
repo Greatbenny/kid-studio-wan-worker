@@ -69,7 +69,8 @@ class WanAnimate2Engine:
 
         reference_url = data.get("reference_image")
         reference_b64 = data.get("reference_image_base64")
-        driving_url = data["driving_video"]
+        driving_url = data.get("driving_video")
+        driving_b64 = data.get("driving_video_base64")
         prompt = data.get("prompt", "")
         seed = int(data.get("seed", 12345))
         fps = int(data.get("fps", 24))
@@ -87,7 +88,10 @@ class WanAnimate2Engine:
             else:
                 self._download(reference_url, reference_path)
 
-            self._download(driving_url, driving_path)
+            if driving_b64:
+                self._write_base64(driving_b64, driving_path)
+            else:
+                self._download(driving_url, driving_path)
 
             pipe = self._load_pipeline()
 
