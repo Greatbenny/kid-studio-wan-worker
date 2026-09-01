@@ -27,10 +27,17 @@ def handler(job):
             ),
         }
 
-    required = ["reference_image", "driving_video"]
-    missing = [name for name in required if not data.get(name)]
-    if missing:
-        return {"ok": False, "error": f"Missing required input: {', '.join(missing)}"}
+    if not data.get("reference_image") and not data.get("reference_image_base64"):
+        return {
+            "ok": False,
+            "error": "Missing required input: reference_image or reference_image_base64",
+        }
+
+    if not data.get("driving_video"):
+        return {
+            "ok": False,
+            "error": "Missing required input: driving_video",
+        }
 
     try:
         return get_engine().generate(data)
