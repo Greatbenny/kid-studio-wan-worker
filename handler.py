@@ -33,10 +33,10 @@ def handler(job):
             "error": "Missing required input: reference_image or reference_image_base64",
         }
 
-    if not data.get("driving_video"):
+    if not data.get("driving_video") and not data.get("driving_video_base64"):
         return {
             "ok": False,
-            "error": "Missing required input: driving_video",
+            "error": "Missing required input: driving_video or driving_video_base64",
         }
 
     try:
