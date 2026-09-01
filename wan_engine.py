@@ -1,3 +1,4 @@
+import base64
 import os
 import tempfile
 from pathlib import Path
@@ -8,8 +9,8 @@ import requests
 class WanAnimate2Engine:
     """Thin adapter around Wan-Animate-2.
 
-    The RunPod transport is intentionally separated from model execution so
-    Kid Studio can later swap model/checkpoint/runtime without changing its API.
+    RunPod transport is kept separate from model execution so Kid Studio can
+    later swap checkpoints/runtimes without changing its public API.
     """
 
     def __init__(self):
@@ -21,7 +22,7 @@ class WanAnimate2Engine:
 
     @staticmethod
     def _download(url: str, destination: Path):
-        with requests.get(url, stream=True, timeout=120) as response:
+        with requests.get(url, stream=True, timeout=180) as response:
             response.raise_for_status()
             with destination.open("wb") as handle:
                 for chunk in response.iter_content(chunk_size=1024 * 1024):
@@ -32,66 +33,84 @@ class WanAnimate2Engine:
         if self._pipeline is not None:
             return self._pipeline
 
-        # Import lazily so a cheap healthcheck can validate the Serverless
-        # container before loading a multi-billion-parameter model.
         import torch
         from diffusers import ModularPipeline
 
         pipe = ModularPipeline.from_pretrained(self.model_id)
         pipe.load_components(dtype=torch.bfloat16)
 
-        transformer = getattr(pipe, "transformer", None)
-        if transformer is not None and hasattr(transformer, "enable_group_offload"):
-            transformer.enable_group_offload(
-                onload_device=torch.device("cuda"),
-                offload_device=torch.device("cpu"),
-                offload_type="block_level",
-                use_stream=True,
-            )
+        pipe.transformer.enable_group_offload(
+            onload_device=torch.device("cuda"),
+            offload_device=torch.device("cpu"),
+            offload_type="block_level",
+            use_stream=True,
+        )
+        pipe.text_encoder.to("cuda")
+        pipe.image_encoder.to("cuda")
+        pipe.vae.to("cuda")
 
-        # Keep small/latency-sensitive components resident when possible.
-        for component_name in ("text_encoder", "image_encoder", "vae"):
-            component = getattr(pipe, component_name, None)
-            if component is not None and hasattr(component, "to"):
-                component.to("cuda")
+        # Required by the current Animate-2 Diffusers implementation because
+        # its in-context attention runs on the flex-attention backend.
+        pipe.transformer.compile_repeated_blocks(fullgraph=False)
 
         self._pipeline = pipe
         return pipe
 
     def generate(self, data):
-        """First benchmark implementation.
+        import torch
+        from diffusers.utils import export_to_video, load_image, load_video
 
-        Input contract is frozen here before Kid Studio integration. We first
-        prove that the selected Animate-2 runtime can load successfully on the
-        chosen RunPod GPU. The exact Diffusers Animate-2 call contract is kept
-        isolated here so it can be adjusted without touching handler.py.
-        """
         reference_url = data["reference_image"]
         driving_url = data["driving_video"]
         prompt = data.get("prompt", "")
         seed = int(data.get("seed", 12345))
+        fps = int(data.get("fps", 24))
+        height = int(data.get("height", 800))
+        width = int(data.get("width", 640))
 
         with tempfile.TemporaryDirectory(prefix="wan-a2-") as tmp:
             tmpdir = Path(tmp)
             reference_path = tmpdir / "reference.png"
             driving_path = tmpdir / "driving.mp4"
+            output_path = tmpdir / "output.mp4"
+
             self._download(reference_url, reference_path)
             self._download(driving_url, driving_path)
 
             pipe = self._load_pipeline()
 
+            image = load_image(str(reference_path))
+            driving_video, driving_video_fps = load_video(
+                str(driving_path), return_fps=True
+            )
+
+            generator = torch.Generator(device="cuda").manual_seed(seed)
+
+            videos = pipe(
+                image=image,
+                driving_video=driving_video,
+                driving_video_fps=driving_video_fps,
+                prompt=prompt,
+                height=height,
+                width=width,
+                fps=fps,
+                generator=generator,
+                output="videos",
+            )
+
+            export_to_video(videos[0], str(output_path), fps=fps)
+            payload = base64.b64encode(output_path.read_bytes()).decode("ascii")
+
             return {
                 "ok": True,
-                "stage": "model_loaded",
+                "stage": "generated",
                 "model_id": self.model_id,
+                "pipeline_class": type(pipe).__name__,
+                "seed": seed,
+                "fps": fps,
                 "reference_bytes": reference_path.stat().st_size,
                 "driving_bytes": driving_path.stat().st_size,
-                "prompt": prompt,
-                "seed": seed,
-                "message": (
-                    "Wan-Animate-2 loaded successfully. The next benchmark "
-                    "step enables the exact generation call after this "
-                    "container/GPU compatibility gate passes."
-                ),
-                "pipeline_class": type(pipe).__name__,
+                "output_bytes": output_path.stat().st_size,
+                "video_mime": "video/mp4",
+                "video_base64": payload,
             }
