@@ -1,16 +1,45 @@
 import gc
 import os
+import shutil
 import traceback
+from pathlib import Path
 
 import runpod
+
+VOLUME_ROOT = Path(
+    os.getenv("RUNPOD_VOLUME_PATH", "/runpod-volume")
+)
+CACHE_PATHS = (
+    VOLUME_ROOT / "huggingface",
+    VOLUME_ROOT / "huggingface" / "hub",
+    VOLUME_ROOT / "torch",
+    VOLUME_ROOT / "tmp",
+)
+
+for cache_path in CACHE_PATHS:
+    cache_path.mkdir(parents=True, exist_ok=True)
 
 from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 
-WORKER_BUILD = "diagnostics-v1"
+WORKER_BUILD = "volume-cache-v2"
 
 _engine = None
 _engine_kind = None
+
+
+def _storage_status():
+    usage = shutil.disk_usage(VOLUME_ROOT)
+    return {
+        "root": str(VOLUME_ROOT),
+        "total_bytes": usage.total,
+        "used_bytes": usage.used,
+        "free_bytes": usage.free,
+        "hf_home": os.getenv("HF_HOME", ""),
+        "hf_hub_cache": os.getenv("HF_HUB_CACHE", ""),
+        "torch_home": os.getenv("TORCH_HOME", ""),
+        "tmpdir": os.getenv("TMPDIR", ""),
+    }
 
 
 def _release_engine():
@@ -61,6 +90,7 @@ def handler(job):
             "ok": True,
             "service": "kid-studio-wan-worker",
             "worker_build": WORKER_BUILD,
+            "storage": _storage_status(),
             "engines": {
                 "animate": os.getenv(
                     "WAN_MODEL_ID",
@@ -110,6 +140,7 @@ def handler(job):
             "message": str(exc) or repr(exc),
             "traceback": trace,
             "worker_build": WORKER_BUILD,
+            "storage": _storage_status(),
         }
 
 
