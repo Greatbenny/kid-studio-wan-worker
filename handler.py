@@ -26,7 +26,7 @@ os.environ["TMPDIR"] = str(VOLUME_ROOT / "tmp")
 from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 
-WORKER_BUILD = "wan-deps-v4"
+WORKER_BUILD = "wan-deps-pinned-v5"
 
 _engine = None
 _engine_kind = None

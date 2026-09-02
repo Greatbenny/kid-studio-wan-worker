@@ -16,10 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt .
 RUN python3 -m pip install --upgrade pip setuptools wheel && \
-    python3 -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126 && \
-    python3 -m pip install -r requirements.txt
+    python3 -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+
+COPY requirements.txt .
+RUN python3 -m pip install -r requirements.txt
 
 COPY . .
 
