@@ -3,9 +3,13 @@ FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/workspace/huggingface \
-    TRANSFORMERS_CACHE=/workspace/huggingface \
-    TORCH_HOME=/workspace/torch
+    RUNPOD_VOLUME_PATH=/runpod-volume \
+    HF_HOME=/runpod-volume/huggingface \
+    HF_HUB_CACHE=/runpod-volume/huggingface/hub \
+    HUGGINGFACE_HUB_CACHE=/runpod-volume/huggingface/hub \
+    TRANSFORMERS_CACHE=/runpod-volume/huggingface/hub \
+    TORCH_HOME=/runpod-volume/torch \
+    TMPDIR=/runpod-volume/tmp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev git ffmpeg curl ca-certificates \
