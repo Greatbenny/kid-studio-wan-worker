@@ -1,10 +1,13 @@
 import gc
 import os
+import traceback
 
 import runpod
 
 from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
+
+WORKER_BUILD = "diagnostics-v1"
 
 _engine = None
 _engine_kind = None
@@ -57,6 +60,7 @@ def handler(job):
         return {
             "ok": True,
             "service": "kid-studio-wan-worker",
+            "worker_build": WORKER_BUILD,
             "engines": {
                 "animate": os.getenv(
                     "WAN_MODEL_ID",
@@ -92,10 +96,20 @@ def handler(job):
 
         return get_engine("animate").generate(data)
     except Exception as exc:
+        trace = "".join(
+            traceback.format_exception(
+                type(exc),
+                exc,
+                exc.__traceback__,
+            )
+        )[-8000:]
+        print(trace, flush=True)
         return {
             "ok": False,
             "error": type(exc).__name__,
-            "message": str(exc),
+            "message": str(exc) or repr(exc),
+            "traceback": trace,
+            "worker_build": WORKER_BUILD,
         }
 
 
