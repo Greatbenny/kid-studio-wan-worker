@@ -19,10 +19,14 @@ CACHE_PATHS = (
 for cache_path in CACHE_PATHS:
     cache_path.mkdir(parents=True, exist_ok=True)
 
+# The network volume exists only when the worker container starts.
+# Set TMPDIR after creating its runtime directory, never during image build.
+os.environ["TMPDIR"] = str(VOLUME_ROOT / "tmp")
+
 from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 
-WORKER_BUILD = "volume-cache-v2"
+WORKER_BUILD = "volume-cache-v3"
 
 _engine = None
 _engine_kind = None
