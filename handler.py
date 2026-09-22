@@ -6,9 +6,7 @@ from pathlib import Path
 
 import runpod
 
-VOLUME_ROOT = Path(
-    os.getenv("RUNPOD_VOLUME_PATH", "/runpod-volume")
-)
+VOLUME_ROOT = Path(os.getenv("RUNPOD_VOLUME_PATH", "/runpod-volume"))
 CACHE_PATHS = (
     VOLUME_ROOT / "huggingface",
     VOLUME_ROOT / "huggingface" / "hub",
@@ -19,17 +17,17 @@ CACHE_PATHS = (
 for cache_path in CACHE_PATHS:
     cache_path.mkdir(parents=True, exist_ok=True)
 
-# The network volume exists only when the worker container starts.
-# Set TMPDIR after creating its runtime directory, never during image build.
 os.environ["TMPDIR"] = str(VOLUME_ROOT / "tmp")
 
 from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
+from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "wan-deps-pinned-v5"
+WORKER_BUILD = "storymind-unified-v1"
 
 _engine = None
 _engine_kind = None
+_storymind = None
 
 
 def _storage_status():
@@ -48,19 +46,15 @@ def _storage_status():
 
 def _release_engine():
     global _engine, _engine_kind
-
     if _engine is not None:
         close = getattr(_engine, "close", None)
         if callable(close):
             close()
-
     _engine = None
     _engine_kind = None
     gc.collect()
-
     try:
         import torch
-
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     except Exception:
@@ -69,74 +63,55 @@ def _release_engine():
 
 def get_engine(kind="animate"):
     global _engine, _engine_kind
-
     if _engine is not None and _engine_kind == kind:
         return _engine
-
     if _engine is not None:
         _release_engine()
-
-    if kind == "performance":
-        _engine = WanPerformanceEngine()
-    else:
-        _engine = WanAnimate2Engine()
-
+    _engine = WanPerformanceEngine() if kind == "performance" else WanAnimate2Engine()
     _engine_kind = kind
     return _engine
+
+
+def get_storymind():
+    global _storymind
+    if _storymind is None:
+        _storymind = StoryMindWorker(VOLUME_ROOT)
+    return _storymind
 
 
 def handler(job):
     data = job.get("input") or {}
     task = str(data.get("task") or "animate").strip().lower()
 
-    if data.get("healthcheck"):
+    if data.get("healthcheck") or task in {"health", "healthcheck", "capabilities"}:
         return {
             "ok": True,
             "service": "kid-studio-wan-worker",
             "worker_build": WORKER_BUILD,
             "storage": _storage_status(),
             "engines": {
-                "animate": os.getenv(
-                    "WAN_MODEL_ID",
-                    "Wan-AI/Wan2.2-Animate-2-14B-Diffusers",
-                ),
-                "performance": os.getenv(
-                    "WAN_PERFORMANCE_MODEL_ID",
-                    "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
-                ),
+                "animate": os.getenv("WAN_MODEL_ID", "Wan-AI/Wan2.2-Animate-2-14B-Diffusers"),
+                "performance": os.getenv("WAN_PERFORMANCE_MODEL_ID", "Wan-AI/Wan2.2-TI2V-5B-Diffusers"),
             },
+            "storymind": get_storymind().capabilities(),
         }
 
     try:
+        if task.startswith("storymind_"):
+            return get_storymind().run(task, data)
+
         if task in {"performance", "performance_generate"}:
             if not str(data.get("prompt") or "").strip():
-                return {
-                    "ok": False,
-                    "error": "Missing required input: prompt",
-                }
+                return {"ok": False, "error": "Missing required input: prompt"}
             return get_engine("performance").generate(data)
 
         if not data.get("reference_image") and not data.get("reference_image_base64"):
-            return {
-                "ok": False,
-                "error": "Missing required input: reference_image or reference_image_base64",
-            }
-
+            return {"ok": False, "error": "Missing required input: reference_image or reference_image_base64"}
         if not data.get("driving_video") and not data.get("driving_video_base64"):
-            return {
-                "ok": False,
-                "error": "Missing required input: driving_video or driving_video_base64",
-            }
-
+            return {"ok": False, "error": "Missing required input: driving_video or driving_video_base64"}
         return get_engine("animate").generate(data)
     except Exception as exc:
-        trace = "".join(
-            traceback.format_exception(
-                type(exc),
-                exc,
-                exc.__traceback__,
-            )
-        )[-8000:]
+        trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-8000:]
         print(trace, flush=True)
         return {
             "ok": False,
