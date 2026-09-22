@@ -79,7 +79,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HOME=/runpod-volume/huggingface \
     HF_HUB_CACHE=/runpod-volume/huggingface/hub \
     TORCH_HOME=/runpod-volume/torch \
-    TMPDIR=/runpod-volume/tmp \
     WORKER_PROFILE=avatar \
     MUSETALK_PATH=/opt/MuseTalk \
     MUSETALK_MODELS_DIR=/runpod-volume/musetalk/models
