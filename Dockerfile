@@ -31,7 +31,15 @@ RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /opt/Comfy
     python3 -m pip install -r /opt/ComfyUI/requirements.txt
 
 RUN git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git /opt/Wav2Lip && \
-    python3 -m pip install -r /opt/Wav2Lip/requirements.txt
+    python3 -m pip install \
+      "librosa>=0.10.2,<0.12" \
+      "numpy>=1.26,<2.3" \
+      "scipy>=1.10" \
+      "numba>=0.57" \
+      "opencv-python-headless>=4.10" \
+      "tqdm>=4.66" \
+      "soundfile>=0.12" \
+      "audioread>=3.0"
 
 COPY . .
 
