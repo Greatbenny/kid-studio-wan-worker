@@ -256,10 +256,11 @@ class StoryMindWorker:
 
     def storymind_lip_sync(self, data):
         wav2lip_path = Path(os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip"))
-        checkpoint = wav2lip_path / "checkpoints" / str(data.get("checkpoint", "wav2lip_gan.pth"))
+        checkpoint_dir = Path(os.getenv("WAV2LIP_CHECKPOINT_DIR", str(wav2lip_path / "checkpoints")))
+        checkpoint = checkpoint_dir / str(data.get("checkpoint", "wav2lip_gan.pth"))
         inference = wav2lip_path / "inference.py"
         if not inference.exists() or not checkpoint.exists():
-            raise RuntimeError("Wav2Lip runtime/checkpoint is not installed in this worker image")
+            raise RuntimeError(f"Wav2Lip runtime/checkpoint is unavailable: {checkpoint}")
 
         with tempfile.TemporaryDirectory(prefix="sm-lipsync-") as tmp:
             root = Path(tmp)
