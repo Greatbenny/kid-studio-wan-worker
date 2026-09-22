@@ -60,6 +60,8 @@ CMD ["python3", "handler.py"]
 FROM cpu-base AS enhancement
 ENV WORKER_PROFILE=enhancement
 RUN python -m pip install \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    python -m pip install \
     runpod requests pillow opencv-python-headless "numpy>=1.26,<2.3" \
     realesrgan gfpgan basicsr facexlib rembg onnxruntime
 COPY . .
