@@ -13,7 +13,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     COMFYUI_ROOT=/opt/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
-    WAV2LIP_PATH=/opt/Wav2Lip
+    WAV2LIP_PATH=/opt/Wav2Lip \
+    WAV2LIP_CHECKPOINT_DIR=/runpod-volume/wav2lip/checkpoints \
+    WAV2LIP_CHECKPOINT_DIR=/runpod-volume/wav2lip/checkpoints
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev git ffmpeg curl ca-certificates \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
