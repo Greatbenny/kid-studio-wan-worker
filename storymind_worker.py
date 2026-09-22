@@ -255,29 +255,83 @@ class StoryMindWorker:
             return {"ok": True, "task": "storymind_bg_remove", "mime": "image/png", "base64": _encode_file(out)}
 
     def storymind_lip_sync(self, data):
-        wav2lip_path = Path(os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip"))
-        checkpoint_dir = Path(os.getenv("WAV2LIP_CHECKPOINT_DIR", str(wav2lip_path / "checkpoints")))
-        checkpoint = checkpoint_dir / str(data.get("checkpoint", "wav2lip_gan.pth"))
-        inference = wav2lip_path / "inference.py"
-        if not inference.exists() or not checkpoint.exists():
-            raise RuntimeError(f"Wav2Lip runtime/checkpoint is unavailable: {checkpoint}")
+        musetalk_path = Path(os.getenv("MUSETALK_PATH", "/opt/MuseTalk"))
+        models_dir = Path(os.getenv("MUSETALK_MODELS_DIR", str(self.volume_root / "musetalk" / "models")))
+        inference = musetalk_path / "scripts" / "inference.py"
+        if not inference.exists():
+            raise RuntimeError(f"MuseTalk runtime is unavailable: {inference}")
 
-        with tempfile.TemporaryDirectory(prefix="sm-lipsync-") as tmp:
+        required = [
+            models_dir / "musetalkV15" / "unet.pth",
+            models_dir / "musetalkV15" / "musetalk.json",
+            models_dir / "sd-vae" / "diffusion_pytorch_model.bin",
+            models_dir / "whisper" / "pytorch_model.bin",
+            models_dir / "dwpose" / "dw-ll_ucoco_384.pth",
+            models_dir / "face-parse-bisent" / "79999_iter.pth",
+            models_dir / "face-parse-bisent" / "resnet18-5c106cde.pth",
+        ]
+        if any(not path.exists() for path in required):
+            models_dir.parent.mkdir(parents=True, exist_ok=True)
+            link = musetalk_path / "models"
+            if link.is_symlink() or link.exists():
+                if link.is_symlink():
+                    link.unlink()
+                elif link.resolve() != models_dir.resolve():
+                    shutil.rmtree(link)
+            if not link.exists():
+                link.symlink_to(models_dir, target_is_directory=True)
+            subprocess.run(
+                ["bash", str(musetalk_path / "download_weights.sh")],
+                cwd=musetalk_path,
+                check=True,
+                timeout=1800,
+            )
+
+        link = musetalk_path / "models"
+        if not link.exists():
+            link.symlink_to(models_dir, target_is_directory=True)
+
+        with tempfile.TemporaryDirectory(prefix="sm-musetalk-") as tmp:
             root = Path(tmp)
             video = root / "video.mp4"
             audio = root / "audio.wav"
-            out = root / "output.mp4"
+            result_dir = root / "results"
+            config = root / "inference.yaml"
             _decode_or_download(data, "video_url", "video_base64", video)
             _decode_or_download(data, "audio_url", "audio_base64", audio)
-            pads = data.get("face_padding", [0, 10, 0, 0])
+
+            bbox_shift = int(data.get("bbox_shift", 0))
+            config.write_text(
+                "task_0:\n"
+                f" video_path: {json.dumps(str(video))}\n"
+                f" audio_path: {json.dumps(str(audio))}\n"
+                f" bbox_shift: {bbox_shift}\n"
+            )
+
             cmd = [
-                "python3", str(inference),
-                "--checkpoint_path", str(checkpoint),
-                "--face", str(video),
-                "--audio", str(audio),
-                "--outfile", str(out),
-                "--pads", *[str(x) for x in pads],
-                "--resize_factor", str(int(data.get("resize_factor", 1))),
+                "python3", "-m", "scripts.inference",
+                "--inference_config", str(config),
+                "--result_dir", str(result_dir),
+                "--unet_model_path", str(models_dir / "musetalkV15" / "unet.pth"),
+                "--unet_config", str(models_dir / "musetalkV15" / "musetalk.json"),
+                "--whisper_dir", str(models_dir / "whisper"),
+                "--version", "v15",
+                "--ffmpeg_path", str(Path(shutil.which("ffmpeg") or "/usr/bin/ffmpeg").parent),
+                "--batch_size", str(int(data.get("batch_size", 8))),
+                "--use_float16",
             ]
-            subprocess.run(cmd, cwd=wav2lip_path, check=True, timeout=900)
-            return {"ok": True, "task": "storymind_lip_sync", "mime": "video/mp4", "base64": _encode_file(out)}
+            subprocess.run(cmd, cwd=musetalk_path, check=True, timeout=1800)
+
+            outputs = sorted(result_dir.rglob("*.mp4"), key=lambda path: path.stat().st_mtime)
+            if not outputs:
+                raise RuntimeError("MuseTalk 1.5 produced no MP4 output")
+            out = outputs[-1]
+            return {
+                "ok": True,
+                "task": "storymind_lip_sync",
+                "engine": "musetalk",
+                "engine_version": "1.5",
+                "mime": "video/mp4",
+                "base64": _encode_file(out),
+            }
+
