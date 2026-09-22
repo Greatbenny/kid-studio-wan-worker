@@ -63,7 +63,8 @@ RUN python -m pip install \
     "torch==2.2.2+cpu" "torchvision==0.17.2+cpu" --index-url https://download.pytorch.org/whl/cpu && \
     python -m pip install \
     runpod requests pillow opencv-python-headless "numpy>=1.26,<2" \
-    realesrgan gfpgan basicsr facexlib rembg onnxruntime
+    realesrgan gfpgan basicsr facexlib rembg onnxruntime && \
+    python -c "from pathlib import Path; p=Path('/usr/local/lib/python3.10/site-packages/basicsr/data/degradations.py'); s=p.read_text(); s=s.replace('from torchvision.transforms.functional_tensor import rgb_to_grayscale','from torchvision.transforms.functional import rgb_to_grayscale'); p.write_text(s)"
 COPY . .
 CMD ["python", "handler.py"]
 
