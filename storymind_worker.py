@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import requests
@@ -34,8 +35,17 @@ def _encode_file(path: Path):
 class StoryMindWorker:
     def __init__(self, volume_root: Path):
         self.volume_root = volume_root
-        self.comfy_url = os.getenv("COMFYUI_SERVER_URL", "").rstrip("/")
         self.comfy_timeout = int(os.getenv("COMFYUI_TIMEOUT_SECONDS", "900"))
+        configured = os.getenv("COMFYUI_SERVER_URL", "").strip().rstrip("/")
+        self.comfy_process = None
+        if configured:
+            self.comfy_url = configured
+            self.comfy_mode = "external"
+        else:
+            host = os.getenv("COMFYUI_HOST", "127.0.0.1")
+            port = int(os.getenv("COMFYUI_PORT", "8188"))
+            self.comfy_url = f"http://{host}:{port}"
+            self.comfy_mode = "bundled"
 
     def capabilities(self):
         return {
@@ -48,6 +58,7 @@ class StoryMindWorker:
                 "storymind_lip_sync",
             ],
             "comfyui_server_url_configured": bool(self.comfy_url),
+            "comfyui_mode": self.comfy_mode,
             "ffmpeg": shutil.which("ffmpeg") is not None,
             "gpu": self._gpu_info(),
         }
@@ -72,9 +83,42 @@ class StoryMindWorker:
             return {"ok": False, "error": f"Unsupported StoryMind task: {task}"}
         return method(data)
 
+    def _ensure_comfyui(self):
+        try:
+            requests.get(f"{self.comfy_url}/system_stats", timeout=3).raise_for_status()
+            return
+        except Exception:
+            pass
+
+        if self.comfy_mode != "bundled":
+            raise RuntimeError("Configured COMFYUI_SERVER_URL is unavailable")
+
+        root = Path(os.getenv("COMFYUI_ROOT", "/opt/ComfyUI"))
+        main = root / "main.py"
+        if not main.exists():
+            raise RuntimeError(f"Bundled ComfyUI not found at {root}")
+
+        if self.comfy_process is None or self.comfy_process.poll() is not None:
+            host = os.getenv("COMFYUI_HOST", "127.0.0.1")
+            port = str(os.getenv("COMFYUI_PORT", "8188"))
+            self.comfy_process = subprocess.Popen(
+                ["python3", str(main), "--listen", host, "--port", port],
+                cwd=root,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+            )
+
+        deadline = time.time() + 90
+        while time.time() < deadline:
+            try:
+                requests.get(f"{self.comfy_url}/system_stats", timeout=3).raise_for_status()
+                return
+            except Exception:
+                time.sleep(1)
+        raise RuntimeError("Bundled ComfyUI failed to start within 90 seconds")
+
     def _comfy_prompt(self, workflow, output_node):
-        if not self.comfy_url:
-            raise RuntimeError("COMFYUI_SERVER_URL is not configured")
+        self._ensure_comfyui()
         prompt = requests.post(
             f"{self.comfy_url}/prompt",
             json={"prompt": workflow},
@@ -83,7 +127,6 @@ class StoryMindWorker:
         prompt.raise_for_status()
         prompt_id = prompt.json()["prompt_id"]
 
-        import time
         deadline = time.time() + self.comfy_timeout
         while time.time() < deadline:
             history = requests.get(
