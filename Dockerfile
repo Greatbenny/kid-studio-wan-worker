@@ -13,9 +13,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     COMFYUI_ROOT=/opt/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
-    WAV2LIP_PATH=/opt/Wav2Lip \
-    WAV2LIP_CHECKPOINT_DIR=/runpod-volume/wav2lip/checkpoints \
-    WAV2LIP_CHECKPOINT_DIR=/runpod-volume/wav2lip/checkpoints
+    MUSETALK_PATH=/opt/MuseTalk \
+    MUSETALK_MODELS_DIR=/runpod-volume/musetalk/models
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev git ffmpeg curl ca-certificates \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
@@ -36,7 +35,8 @@ ENV PYTHONUNBUFFERED=1 \
     COMFYUI_ROOT=/opt/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
-    WAV2LIP_PATH=/opt/Wav2Lip
+    MUSETALK_PATH=/opt/MuseTalk \
+    MUSETALK_MODELS_DIR=/runpod-volume/musetalk/models
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ffmpeg curl ca-certificates libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
     && rm -rf /var/lib/apt/lists/*
@@ -70,19 +70,35 @@ RUN python -m pip install \
 COPY . .
 CMD ["python", "handler.py"]
 
-FROM gpu-base AS avatar
-ENV WORKER_PROFILE=avatar
-RUN python3 -m pip install runpod requests pillow opencv-python-headless "numpy>=1.26,<2.3" && \
-    git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git /opt/Wav2Lip && \
-    python3 -m pip install \
-      "librosa>=0.10.2,<0.12" \
-      "numpy>=1.26,<2.3" \
-      "scipy>=1.10" \
-      "numba>=0.57" \
-      "opencv-python-headless>=4.10" \
-      "tqdm>=4.66" \
-      "soundfile>=0.12" \
-      "audioread>=3.0"
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS avatar
+ARG MUSETALK_COMMIT=0a89dec45a0192b824e3cf4daf96c239440c5ed8
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    RUNPOD_VOLUME_PATH=/runpod-volume \
+    HF_HOME=/runpod-volume/huggingface \
+    HF_HUB_CACHE=/runpod-volume/huggingface/hub \
+    TORCH_HOME=/runpod-volume/torch \
+    TMPDIR=/runpod-volume/tmp \
+    WORKER_PROFILE=avatar \
+    MUSETALK_PATH=/opt/MuseTalk \
+    MUSETALK_MODELS_DIR=/runpod-volume/musetalk/models
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-dev git ffmpeg curl ca-certificates build-essential \
+      libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    python3 -m pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 && \
+    git clone https://github.com/TMElyralab/MuseTalk.git /opt/MuseTalk && \
+    cd /opt/MuseTalk && git checkout "${MUSETALK_COMMIT}" && \
+    python3 -m pip install -r requirements.txt && \
+    python3 -m pip install "runpod>=1.7.12" "requests>=2.32.5" openmim && \
+    mim install mmengine && \
+    mim install "mmcv==2.0.1" && \
+    mim install "mmdet==3.1.0" && \
+    mim install "mmpose==1.1.0" && \
+    sed -i '/export HF_ENDPOINT=/d' /opt/MuseTalk/download_weights.sh
+WORKDIR /app
 COPY . .
 CMD ["python3", "handler.py"]
 
