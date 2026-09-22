@@ -23,7 +23,7 @@ from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "storymind-unified-v1"
+WORKER_BUILD = "storymind-unified-v2"
 
 _engine = None
 _engine_kind = None

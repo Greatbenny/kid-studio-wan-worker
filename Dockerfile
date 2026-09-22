@@ -10,6 +10,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRANSFORMERS_CACHE=/runpod-volume/huggingface/hub \
     TORCH_HOME=/runpod-volume/torch \
     COMFYUI_ROOT=/opt/ComfyUI \
+    COMFYUI_HOST=127.0.0.1 \
+    COMFYUI_PORT=8188 \
     WAV2LIP_PATH=/opt/Wav2Lip
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,11 +27,11 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
 COPY requirements.txt .
 RUN python3 -m pip install -r requirements.txt
 
-# Optional local runtimes used by StoryMind-compatible tasks.
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI && \
-    python3 -m pip install -r /opt/ComfyUI/requirements.txt && \
-    git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git /opt/Wav2Lip && \
-    python3 -m pip install -r /opt/Wav2Lip/requirements.txt || true
+    python3 -m pip install -r /opt/ComfyUI/requirements.txt
+
+RUN git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git /opt/Wav2Lip && \
+    python3 -m pip install -r /opt/Wav2Lip/requirements.txt
 
 COPY . .
 
