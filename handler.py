@@ -23,7 +23,7 @@ from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "storymind-unified-v2"
+WORKER_BUILD = "storymind-profiled-v3"\nWORKER_PROFILE = os.getenv("WORKER_PROFILE", "video").strip().lower()
 
 _engine = None
 _engine_kind = None
@@ -100,7 +100,7 @@ def handler(job):
         if task.startswith("storymind_"):
             return get_storymind().run(task, data)
 
-        if task in {"performance", "performance_generate"}:
+        if WORKER_PROFILE != "video":\n            return {"ok": False, "error": f"Task {task} is not enabled for worker profile {WORKER_PROFILE}"}\n\n        if task in {"performance", "performance_generate"}:
             if not str(data.get("prompt") or "").strip():
                 return {"ok": False, "error": "Missing required input: prompt"}
             return get_engine("performance").generate(data)
