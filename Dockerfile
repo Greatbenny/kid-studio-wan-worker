@@ -95,6 +95,7 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
     mim install mmengine && \
     mim install "mmcv==2.0.1" && \
     mim install "mmdet==3.1.0" && \
+    python3 -m pip install "chumpy==0.70" --no-build-isolation && \
     mim install "mmpose==1.1.0" && \
     sed -i '/export HF_ENDPOINT=/d' /opt/MuseTalk/download_weights.sh
 WORKDIR /app
