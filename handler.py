@@ -23,7 +23,7 @@ from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "storymind-profiled-v3"
+WORKER_BUILD = "storymind-profiled-v4-storage-diagnostics"
 WORKER_PROFILE = os.getenv("WORKER_PROFILE", "video").strip().lower()
 
 _engine = None
@@ -31,17 +31,55 @@ _engine_kind = None
 _storymind = None
 
 
+def _dir_size(path: Path):
+    if not path.exists():
+        return 0
+    total = 0
+    for root, _, files in os.walk(path):
+        for name in files:
+            try:
+                total += (Path(root) / name).stat().st_size
+            except OSError:
+                pass
+    return total
+
+
 def _storage_status():
     usage = shutil.disk_usage(VOLUME_ROOT)
+    comfy_models = VOLUME_ROOT / "comfyui" / "models"
+    hf_root = Path(os.getenv("HF_HOME", str(VOLUME_ROOT / "huggingface")))
+    hf_cache = Path(os.getenv("HF_HUB_CACHE", str(hf_root / "hub")))
     return {
         "root": str(VOLUME_ROOT),
         "total_bytes": usage.total,
         "used_bytes": usage.used,
         "free_bytes": usage.free,
-        "hf_home": os.getenv("HF_HOME", ""),
-        "hf_hub_cache": os.getenv("HF_HUB_CACHE", ""),
+        "hf_home": str(hf_root),
+        "hf_hub_cache": str(hf_cache),
         "torch_home": os.getenv("TORCH_HOME", ""),
         "tmpdir": os.getenv("TMPDIR", ""),
+        "paths": {
+            "comfy_models": {
+                "path": str(comfy_models),
+                "exists": comfy_models.exists(),
+                "bytes": _dir_size(comfy_models),
+            },
+            "hf_home": {
+                "path": str(hf_root),
+                "exists": hf_root.exists(),
+                "bytes": _dir_size(hf_root),
+            },
+            "hf_hub_cache": {
+                "path": str(hf_cache),
+                "exists": hf_cache.exists(),
+                "bytes": _dir_size(hf_cache),
+            },
+            "tmp": {
+                "path": str(VOLUME_ROOT / "tmp"),
+                "exists": (VOLUME_ROOT / "tmp").exists(),
+                "bytes": _dir_size(VOLUME_ROOT / "tmp"),
+            },
+        },
     }
 
 
