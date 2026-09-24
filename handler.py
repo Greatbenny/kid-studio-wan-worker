@@ -23,7 +23,7 @@ from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "storymind-profiled-v4-storage-diagnostics"
+WORKER_BUILD = "storymind-profiled-v5-volume-compare"
 WORKER_PROFILE = os.getenv("WORKER_PROFILE", "video").strip().lower()
 
 _engine = None
@@ -44,6 +44,24 @@ def _dir_size(path: Path):
     return total
 
 
+def _disk_status(path: Path):
+    try:
+        usage = shutil.disk_usage(path)
+        return {
+            "path": str(path),
+            "exists": path.exists(),
+            "total_bytes": usage.total,
+            "used_bytes": usage.used,
+            "free_bytes": usage.free,
+        }
+    except OSError as exc:
+        return {
+            "path": str(path),
+            "exists": path.exists(),
+            "error": str(exc),
+        }
+
+
 def _storage_status():
     usage = shutil.disk_usage(VOLUME_ROOT)
     comfy_models = VOLUME_ROOT / "comfyui" / "models"
@@ -58,6 +76,10 @@ def _storage_status():
         "hf_hub_cache": str(hf_cache),
         "torch_home": os.getenv("TORCH_HOME", ""),
         "tmpdir": os.getenv("TMPDIR", ""),
+        "mount_compare": {
+            "runpod_volume": _disk_status(Path("/runpod-volume")),
+            "workspace": _disk_status(Path("/workspace")),
+        },
         "paths": {
             "comfy_models": {
                 "path": str(comfy_models),
