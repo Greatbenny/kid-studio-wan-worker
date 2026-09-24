@@ -118,12 +118,16 @@ class StoryMindWorker:
                     continue
                 comfy_dir.unlink()
             elif comfy_dir.exists():
-                if any(comfy_dir.iterdir()):
-                    for child in comfy_dir.iterdir():
-                        destination = target_dir / child.name
-                        if not destination.exists():
-                            shutil.move(str(child), str(destination))
-                comfy_dir.rmdir()
+                for child in list(comfy_dir.iterdir()):
+                    destination = target_dir / child.name
+                    if destination.exists():
+                        if child.is_dir():
+                            shutil.rmtree(child)
+                        else:
+                            child.unlink()
+                    else:
+                        shutil.move(str(child), str(destination))
+                shutil.rmtree(comfy_dir)
             comfy_dir.symlink_to(target_dir, target_is_directory=True)
 
         try:
