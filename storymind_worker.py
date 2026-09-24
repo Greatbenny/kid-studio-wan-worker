@@ -124,7 +124,14 @@ class StoryMindWorker:
             json={"prompt": workflow},
             timeout=30,
         )
-        prompt.raise_for_status()
+        if not prompt.ok:
+            detail = prompt.text.strip()
+            if len(detail) > 4000:
+                detail = detail[:4000] + "..."
+            raise RuntimeError(
+                f"ComfyUI /prompt failed ({prompt.status_code}): "
+                f"{detail or '<empty response body>'}"
+            )
         prompt_id = prompt.json()["prompt_id"]
 
         deadline = time.time() + self.comfy_timeout
@@ -334,4 +341,3 @@ class StoryMindWorker:
                 "mime": "video/mp4",
                 "base64": _encode_file(out),
             }
-
