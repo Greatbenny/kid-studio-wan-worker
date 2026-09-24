@@ -164,7 +164,7 @@ class StoryMindWorker:
     def _workflow(self, data):
         raw = data.get("workflow_json")
         if raw:
-            return json.loads(raw) if isinstance(raw, str) else raw
+            return json.loads(raw.lstrip("\ufeff")) if isinstance(raw, str) else raw
         raise ValueError("workflow_json is required for StoryMind ComfyUI serverless tasks")
 
     def storymind_comfyui_image(self, data):
