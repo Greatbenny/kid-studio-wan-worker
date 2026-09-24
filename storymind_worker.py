@@ -87,7 +87,6 @@ class StoryMindWorker:
         if self.comfy_mode != "bundled":
             return
 
-        root = Path(os.getenv("COMFYUI_ROOT", "/opt/ComfyUI"))
         persistent = self.volume_root / "comfyui" / "models"
         model_specs = [
             {
@@ -110,25 +109,7 @@ class StoryMindWorker:
         ]
 
         for subdir in ("diffusion_models", "text_encoders", "vae"):
-            target_dir = persistent / subdir
-            target_dir.mkdir(parents=True, exist_ok=True)
-            comfy_dir = root / "models" / subdir
-            if comfy_dir.is_symlink():
-                if comfy_dir.resolve() == target_dir.resolve():
-                    continue
-                comfy_dir.unlink()
-            elif comfy_dir.exists():
-                for child in list(comfy_dir.iterdir()):
-                    destination = target_dir / child.name
-                    if destination.exists():
-                        if child.is_dir():
-                            shutil.rmtree(child)
-                        else:
-                            child.unlink()
-                    else:
-                        shutil.move(str(child), str(destination))
-                shutil.rmtree(comfy_dir)
-            comfy_dir.symlink_to(target_dir, target_is_directory=True)
+            (persistent / subdir).mkdir(parents=True, exist_ok=True)
 
         try:
             from huggingface_hub import hf_hub_download
@@ -154,6 +135,20 @@ class StoryMindWorker:
                 shutil.copy2(downloaded, tmp)
             tmp.replace(target)
 
+    def _comfyui_extra_model_paths(self):
+        persistent = self.volume_root / "comfyui" / "models"
+        config = self.volume_root / "comfyui" / "extra_model_paths.yaml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            "storymind_persistent:\n"
+            f"  base_path: {persistent}\n"
+            "  diffusion_models: diffusion_models\n"
+            "  text_encoders: text_encoders\n"
+            "  vae: vae\n",
+            encoding="utf-8",
+        )
+        return config
+
     def _ensure_comfyui(self):
         self._ensure_comfyui_models()
         try:
@@ -173,8 +168,18 @@ class StoryMindWorker:
         if self.comfy_process is None or self.comfy_process.poll() is not None:
             host = os.getenv("COMFYUI_HOST", "127.0.0.1")
             port = str(os.getenv("COMFYUI_PORT", "8188"))
+            extra_paths = self._comfyui_extra_model_paths()
             self.comfy_process = subprocess.Popen(
-                ["python3", str(main), "--listen", host, "--port", port],
+                [
+                    "python3",
+                    str(main),
+                    "--listen",
+                    host,
+                    "--port",
+                    port,
+                    "--extra-model-paths-config",
+                    str(extra_paths),
+                ],
                 cwd=root,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.STDOUT,
