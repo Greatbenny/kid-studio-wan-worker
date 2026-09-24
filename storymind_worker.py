@@ -83,7 +83,75 @@ class StoryMindWorker:
             return {"ok": False, "error": f"Unsupported StoryMind task: {task}"}
         return method(data)
 
+    def _ensure_comfyui_models(self):
+        if self.comfy_mode != "bundled":
+            return
+
+        root = Path(os.getenv("COMFYUI_ROOT", "/opt/ComfyUI"))
+        persistent = self.volume_root / "comfyui" / "models"
+        model_specs = [
+            {
+                "repo_id": "black-forest-labs/FLUX.2-dev-NVFP4",
+                "filename": "flux2-dev-nvfp4.safetensors",
+                "subdir": "diffusion_models",
+            },
+            {
+                "repo_id": "Comfy-Org/flux2-dev",
+                "filename": "split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
+                "subdir": "text_encoders",
+                "target_name": "mistral_3_small_flux2_fp4_mixed.safetensors",
+            },
+            {
+                "repo_id": "Comfy-Org/flux2-dev",
+                "filename": "split_files/vae/flux2-vae.safetensors",
+                "subdir": "vae",
+                "target_name": "flux2-vae.safetensors",
+            },
+        ]
+
+        for subdir in ("diffusion_models", "text_encoders", "vae"):
+            target_dir = persistent / subdir
+            target_dir.mkdir(parents=True, exist_ok=True)
+            comfy_dir = root / "models" / subdir
+            if comfy_dir.is_symlink():
+                if comfy_dir.resolve() == target_dir.resolve():
+                    continue
+                comfy_dir.unlink()
+            elif comfy_dir.exists():
+                if any(comfy_dir.iterdir()):
+                    for child in comfy_dir.iterdir():
+                        destination = target_dir / child.name
+                        if not destination.exists():
+                            shutil.move(str(child), str(destination))
+                comfy_dir.rmdir()
+            comfy_dir.symlink_to(target_dir, target_is_directory=True)
+
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError as exc:
+            raise RuntimeError("huggingface_hub is required to provision ComfyUI models") from exc
+
+        for spec in model_specs:
+            target_name = spec.get("target_name") or Path(spec["filename"]).name
+            target = persistent / spec["subdir"] / target_name
+            if target.exists() and target.stat().st_size > 0:
+                continue
+            downloaded = Path(hf_hub_download(
+                repo_id=spec["repo_id"],
+                filename=spec["filename"],
+                cache_dir=str(self.volume_root / "huggingface" / "hub"),
+            ))
+            tmp = target.with_suffix(target.suffix + ".partial")
+            if tmp.exists():
+                tmp.unlink()
+            try:
+                os.link(downloaded, tmp)
+            except OSError:
+                shutil.copy2(downloaded, tmp)
+            tmp.replace(target)
+
     def _ensure_comfyui(self):
+        self._ensure_comfyui_models()
         try:
             requests.get(f"{self.comfy_url}/system_stats", timeout=3).raise_for_status()
             return
