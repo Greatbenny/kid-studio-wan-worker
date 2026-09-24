@@ -23,7 +23,7 @@ from performance_engine import WanPerformanceEngine
 from wan_engine import WanAnimate2Engine
 from storymind_worker import StoryMindWorker
 
-WORKER_BUILD = "storymind-profiled-v5-volume-compare"
+WORKER_BUILD = "storymind-profiled-v6-storage-inventory"
 WORKER_PROFILE = os.getenv("WORKER_PROFILE", "video").strip().lower()
 
 _engine = None
@@ -42,6 +42,54 @@ def _dir_size(path: Path):
             except OSError:
                 pass
     return total
+
+def _largest_entries(path: Path, limit=25):
+    if not path.exists() or not path.is_dir():
+        return []
+    entries = []
+    try:
+        children = list(path.iterdir())
+    except OSError:
+        return []
+    for child in children:
+        try:
+            size = _dir_size(child) if child.is_dir() else child.stat().st_size
+            entries.append({
+                "name": child.name,
+                "path": str(child),
+                "type": "dir" if child.is_dir() else "file",
+                "bytes": size,
+            })
+        except OSError:
+            continue
+    entries.sort(key=lambda item: item["bytes"], reverse=True)
+    return entries[:limit]
+
+
+def _partial_downloads(path: Path, limit=50):
+    if not path.exists():
+        return []
+    matches = []
+    for root, _, files in os.walk(path):
+        for name in files:
+            lower = name.lower()
+            if not (
+                lower.endswith(".partial")
+                or lower.endswith(".incomplete")
+                or lower.endswith(".tmp")
+                or ".incomplete" in lower
+            ):
+                continue
+            candidate = Path(root) / name
+            try:
+                matches.append({
+                    "path": str(candidate),
+                    "bytes": candidate.stat().st_size,
+                })
+            except OSError:
+                pass
+    matches.sort(key=lambda item: item["bytes"], reverse=True)
+    return matches[:limit]
 
 
 def _disk_status(path: Path):
@@ -102,6 +150,14 @@ def _storage_status():
                 "bytes": _dir_size(VOLUME_ROOT / "tmp"),
             },
         },
+        "largest": {
+            "volume_root": _largest_entries(VOLUME_ROOT),
+            "huggingface": _largest_entries(hf_root),
+            "huggingface_hub": _largest_entries(hf_cache),
+            "comfyui": _largest_entries(VOLUME_ROOT / "comfyui"),
+            "comfyui_models": _largest_entries(comfy_models),
+        },
+        "partial_downloads": _partial_downloads(VOLUME_ROOT),
     }
 
 
