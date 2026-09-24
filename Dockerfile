@@ -4,17 +4,17 @@ FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04 AS gpu-base
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/workspace} \
-    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface} \
-    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/torch} \
+    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/runpod-volume} \
+    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface} \
+    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/torch} \
     COMFYUI_ROOT=/opt/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
     MUSETALK_PATH=/opt/MuseTalk \
-    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/workspace}/musetalk/models} \
+    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/musetalk/models} \
     HF_HUB_DISABLE_XET=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev git ffmpeg curl ca-certificates \
@@ -27,17 +27,17 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
 FROM python:3.10-slim-bookworm AS cpu-base
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/workspace} \
-    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface} \
-    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/torch} \
+    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/runpod-volume} \
+    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface} \
+    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    HUGGINGFACE_HUB_CACHE=${HUGGINGFACE_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/torch} \
     COMFYUI_ROOT=/opt/ComfyUI \
     COMFYUI_HOST=127.0.0.1 \
     COMFYUI_PORT=8188 \
     MUSETALK_PATH=/opt/MuseTalk \
-    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/workspace}/musetalk/models} \
+    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/musetalk/models} \
     HF_HUB_DISABLE_XET=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ffmpeg curl ca-certificates libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
@@ -77,13 +77,13 @@ ARG MUSETALK_COMMIT=0a89dec45a0192b824e3cf4daf96c239440c5ed8
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/workspace} \
-    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface} \
-    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/workspace}/huggingface/hub} \
-    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/workspace}/torch} \
+    RUNPOD_VOLUME_PATH=${RUNPOD_VOLUME_PATH:-/runpod-volume} \
+    HF_HOME=${HF_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface} \
+    HF_HUB_CACHE=${HF_HUB_CACHE:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/huggingface/hub} \
+    TORCH_HOME=${TORCH_HOME:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/torch} \
     WORKER_PROFILE=avatar \
     MUSETALK_PATH=/opt/MuseTalk \
-    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/workspace}/musetalk/models} \
+    MUSETALK_MODELS_DIR=${MUSETALK_MODELS_DIR:-${RUNPOD_VOLUME_PATH:-/runpod-volume}/musetalk/models} \
     HF_HUB_DISABLE_XET=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-dev git ffmpeg curl ca-certificates build-essential \
