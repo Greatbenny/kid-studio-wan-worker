@@ -217,7 +217,11 @@ def handler(job):
     try:
         if task.startswith("storymind_"):
             allowed = {
-                "comfyui": {"storymind_comfyui_image", "storymind_comfyui_video"},
+                "comfyui": {
+                    "storymind_comfyui_image",
+                    "storymind_comfyui_video",
+                    "storymind_comfyui_provision",
+                },
                 "enhancement": {"storymind_upscale", "storymind_face_restore", "storymind_bg_remove"},
                 "avatar": {"storymind_lip_sync"},
             }.get(WORKER_PROFILE, set())
