@@ -78,6 +78,8 @@ class StoryMindWorker:
             return {"available": False}
 
     def run(self, task, data):
+        if task == "storymind_comfyui_provision":
+            return self._provision_comfyui_models()
         method = getattr(self, task, None)
         if method is None:
             return {"ok": False, "error": f"Unsupported StoryMind task: {task}"}
@@ -148,6 +150,19 @@ class StoryMindWorker:
             encoding="utf-8",
         )
         return config
+
+    def _provision_comfyui_models(self):
+        self._ensure_comfyui_models()
+        persistent = self.volume_root / "comfyui" / "models"
+        return {
+            "ok": True,
+            "task": "storymind_comfyui_provision",
+            "models": {
+                "diffusion_models": str(persistent / "diffusion_models"),
+                "text_encoders": str(persistent / "text_encoders"),
+                "vae": str(persistent / "vae"),
+            },
+        }
 
     def _ensure_comfyui(self):
         self._ensure_comfyui_models()
