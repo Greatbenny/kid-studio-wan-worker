@@ -224,6 +224,10 @@ def handler(job):
                 },
                 "enhancement": {"storymind_upscale", "storymind_face_restore", "storymind_bg_remove"},
                 "avatar": {"storymind_lip_sync"},
+                "video": {
+                    "storymind_text_to_video",
+                    "storymind_image_to_video",
+                },
             }.get(WORKER_PROFILE, set())
             if task not in allowed:
                 return {"ok": False, "error": f"Task {task} is not enabled for worker profile {WORKER_PROFILE}"}
