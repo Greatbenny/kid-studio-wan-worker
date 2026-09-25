@@ -353,6 +353,27 @@ class StoryMindWorker:
             out.write_bytes(remove(src.read_bytes()))
             return {"ok": True, "task": "storymind_bg_remove", "mime": "image/png", "base64": _encode_file(out)}
 
+    def storymind_text_to_video(self, data):
+        from performance_engine import WanPerformanceEngine
+
+        payload = dict(data)
+        payload.pop("task", None)
+        payload.pop("input_base64", None)
+
+        return WanPerformanceEngine().generate(payload)
+
+    def storymind_image_to_video(self, data):
+        from performance_engine import WanPerformanceEngine
+
+        payload = dict(data)
+        payload.pop("task", None)
+
+        input_b64 = payload.pop("input_base64", None)
+        if input_b64 and not payload.get("reference_image_base64"):
+            payload["reference_image_base64"] = input_b64
+
+        return WanPerformanceEngine().generate(payload)
+
     def storymind_lip_sync(self, data):
         musetalk_path = Path(os.getenv("MUSETALK_PATH", "/opt/MuseTalk"))
         models_dir = Path(os.getenv("MUSETALK_MODELS_DIR", str(self.volume_root / "musetalk" / "models")))
